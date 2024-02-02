@@ -33,19 +33,29 @@ for catalog in all_catalogs:
 
 # COMMAND ----------
 
-table_location = []
+tables_info = []
 catalogs = []
+table_errors = [["dummy_table", "dummy_error"]]
+
 for catalog in all_catalogs:
     catalog_name = catalog.catalog
     catalogs.append([catalog_name])
     tables_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/tables").filter("table_schema<>'information_schema' and table_type='EXTERNAL'")
     for table in tables_df.collect():
-        print(f"{table.table_schema}.{table.table_name}")
-        location = spark.sql(f"DESCRIBE EXTENDED {catalog_name}.{table.table_schema}.{table.table_name}").filter("col_name == 'Location'").first()['data_type']
-        table_location.append([f"{catalog_name}.{table.table_schema}.{table.table_name}", location])
-table_location_df = spark.createDataFrame(table_location, ['full_name', 'location'])
-display(table_location_df)
+        print(f"----scan details for external table: {catalog_name}.{table.table_schema}.{table.table_name}")
+        try:
+            table_info = spark.sql(f"DESCRIBE DETAIL {catalog_name}.{table.table_schema}.{table.table_name}").first()
+            tables_info.append([f"{catalog_name}.{table.table_schema}.{table.table_name}", table_info['location'], table_info['partitionColumns'], table_info['clusteringColumns'], table_info['properties']])
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            table_errors.append([f"{catalog_name}.{table.table_schema}.{table.table_name}", f"An unexpected error occurred: {e}"])
+
+tables_info_df = spark.createDataFrame(tables_info, ['full_name', 'location', 'partitionColumns', 'clusteringColumns', 'properties'])
+tables_info_df.write.format("delta").mode("overwrite").save(f"{storage_location}/uc_dr_tables_details")
+
 catalogs_df = spark.createDataFrame(catalogs, ['catalog'])
-display(catalogs_df)
-table_location_df.write.format("delta").mode("overwrite").save(f"{storage_location}/uc_dr_table_locations")
 catalogs_df.write.format("delta").mode("overwrite").save(f"{storage_location}/uc_dr_catalogs")
+
+table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
+if table_errors_df.count() > 1:
+   display(table_errors_df)
