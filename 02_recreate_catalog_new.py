@@ -63,7 +63,7 @@ display(catalogs_df)
 
 # COMMAND ----------
 
-table_errors = [["dummy_table", "dummy_error"]]
+table_errors = []
 table_properities_system_level = ['delta.liquid.clusteringColumns', 'delta.rowTracking.materializedRowIdColumnName', 'delta.rowTracking.materializedRowCommitVersionColumnName']
 
 #delete catalog which are not in primary any more
@@ -148,9 +148,9 @@ for catalog in catalogs_df.collect():
             print(f"An unexpected error occurred: {e}")
             table_errors.append([name, f"An unexpected error occurred: {e}"])
 
-table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
-if table_errors_df.count() > 1:
-   display(table_errors_df)
+if len(table_errors) > 0:
+    table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
+    display(table_errors_df)
 
 # COMMAND ----------
 
