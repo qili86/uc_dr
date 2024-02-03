@@ -47,7 +47,7 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 
 tables_info = []
 catalogs = []
-table_errors = [["dummy_table", "dummy_error"]]
+table_errors = []
 tables_create_stmt = []
 
 for catalog in all_catalogs:
@@ -84,6 +84,6 @@ display(tables_create_stmt_df)
 catalogs_df = spark.createDataFrame(catalogs, ['catalog'])
 catalogs_df.write.format("delta").mode("overwrite").save(f"{storage_location}/uc_dr_catalogs")
 
-table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
-if table_errors_df.count() > 1:
-   display(table_errors_df)
+if len(table_errors) > 0:
+    table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
+    display(table_errors_df)
