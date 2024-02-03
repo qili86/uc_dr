@@ -45,6 +45,11 @@ display(catalogs_df)
 # COMMAND ----------
 
 tables_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_details")
+tables_create_stmts_df =  spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_create_stmts")
+tcs_dict = {}
+for tcs in tables_create_stmts_df.collect():
+    tcs_dict[tcs['name']] = tcs['stmt']
+print(tcs_dict)
 
 # COMMAND ----------
 
@@ -58,7 +63,6 @@ display(catalogs_df)
 
 # COMMAND ----------
 
-tables_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_details")
 table_errors = [["dummy_table", "dummy_error"]]
 table_properities_system_level = ['delta.liquid.clusteringColumns', 'delta.rowTracking.materializedRowIdColumnName', 'delta.rowTracking.materializedRowCommitVersionColumnName']
 
@@ -87,9 +91,9 @@ for catalog in catalogs_df.collect():
     if len(deleted_schema_list) > 0:
         print(f"----These schemas are not exsiting in primary: {deleted_schema_list}, and they will be deleted")
         for schema in deleted_schema_list:
-            drop_schema_stm = f"DROP SCHEMA IF EXISTS {schema} CASCADE"
-            print(drop_schema_stm)
-            spark.sql(drop_schema_stm)
+            drop_schema_stmt = f"DROP SCHEMA IF EXISTS {schema} CASCADE"
+            print(drop_schema_stmt)
+            spark.sql(drop_schema_stmt)
     
     #Create all user schemas on the target catalog
 
@@ -106,27 +110,28 @@ for catalog in catalogs_df.collect():
     if len(deleted_table_list) > 0:
         print(f"----These tables are not exsiting in primary: {deleted_table_list}, and they will be deleted")
         for table in deleted_table_list:
-            drop_table_stm = f"DROP TABLE IF EXISTS {table}"
-            print(drop_table_stm)
-            spark.sql(drop_table_stm)
+            drop_table_stmt = f"DROP TABLE IF EXISTS {table}"
+            print(drop_table_stmt)
+            spark.sql(drop_table_stmt)
     
     for table in tables_df.collect():
         columns_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/columns").filter((col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
-        print(f"{catalog_name}.{table.table_schema}.{table.table_name}")
+        name = f"{catalog_name}.{table.table_schema}.{table.table_name}"
+        print(name)
         columns = return_schema(columns_df)
         #Create Table
         try:
-            drop_table_stm = f"DROP TABLE IF EXISTS {catalog_name}.{table.table_schema}.{table.table_name}"
-            print(drop_table_stm)
-            spark.sql(drop_table_stm)
-            
-            ct_st = f"CREATE TABLE IF NOT EXISTS {catalog_name}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
+            drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
+            print(drop_table_stmt)
+            spark.sql(drop_table_stmt)
+            # ct_stmt = tcs_dict[name]
+            ct_stmt = f"CREATE TABLE IF NOT EXISTS {catalog_name}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             if table.partitionColumns is not None and table.partitionColumns !=[]:
                 pks = ",".join(table.partitionColumns)
-                ct_st = ct_st + f" PARTITIONED BY ({pks})" 
+                ct_stmt = ct_stmt + f" PARTITIONED BY ({pks})" 
             if table.clusteringColumns is not None and table.clusteringColumns != []:
                 cks = ",".join(table.clusteringColumns)
-                ct_st = ct_st + f" CLUSTER BY ({cks})" 
+                ct_stmt = ct_stmt + f" CLUSTER BY ({cks})" 
             if table.properties is not None and table.properties != {}:
                 ppts=table.properties
                 for ppt in table_properities_system_level:
@@ -135,13 +140,13 @@ for catalog in catalogs_df.collect():
                     properties_str = "" 
                     for key, value in ppts.items():
                         properties_str=properties_str+ f"'{key}'='{value}',"
-                    ct_st = ct_st + f" TBLPROPERTIES ({properties_str[:-1]})"
-            print(ct_st)
-            spark.sql(ct_st)
-            spark.sql(f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`")
+                    ct_stmt = ct_stmt + f" TBLPROPERTIES ({properties_str[:-1]})"
+            print(ct_stmt)
+            spark.sql(ct_stmt)
+            spark.sql(f"ALTER TABLE {name} SET OWNER to `{table.table_owner}`")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
-            table_errors.append([f"{catalog_name}.{table.table_schema}.{table.table_name}", f"An unexpected error occurred: {e}"])
+            table_errors.append([name, f"An unexpected error occurred: {e}"])
 
 table_errors_df = spark.createDataFrame(table_errors, ['table', 'error'])
 if table_errors_df.count() > 1:
