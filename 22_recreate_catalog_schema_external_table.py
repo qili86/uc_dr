@@ -14,27 +14,20 @@
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
-dbutils.widgets.text("storageLocation", "abfss://metadata@eastus2external.dfs.core.windows.net/", "Storage with source catalog info")
-dbutils.widgets.text("rootExternalStorage", "abfss://data@starbucksdev.dfs.core.windows.net/daibo/", "Root of external tables' path")
-dbutils.widgets.text("catalogName", "", "catalog name, it is empty by default to run all catalog, set it to a specific catalog for testing")
+dbutils.widgets.text("storageLocation", "abfss://system@eastus2external.dfs.core.windows.net/", "Storage with source catalog info")
 
 # COMMAND ----------
 
 storage_location = dbutils.widgets.get("storageLocation")
-root_externalstorage =  dbutils.widgets.get("rootExternalStorage")
-catalog_name = dbutils.widgets.get("catalogName")
-
 print(storage_location)
-print(root_externalstorage)
-print(catalog_name)
 
 # COMMAND ----------
 
-# MAGIC %run ./utility/shared_functions
+# MAGIC %run ./utils
 
 # COMMAND ----------
 
-catalogs_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_catalogs")
+catalogs_df = spark.read.format("delta").load(f"{storage_location}/catalogs").filter("catalog_owner<>'System user'")
 display(catalogs_df)
 
 # COMMAND ----------
@@ -45,7 +38,7 @@ display(catalogs_df)
 # COMMAND ----------
 
 tables_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_details")
-tables_create_stmts_df =  spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_create_stmts")
+tables_create_stmts_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_create_stmts")
 tcs_dict = {}
 for tcs in tables_create_stmts_df.collect():
     tcs_dict[tcs['name']] = tcs['stmt']
@@ -57,16 +50,10 @@ display(tables_details_df)
 
 # COMMAND ----------
 
-if catalog_name:
-    catalogs_df = catalogs_df.filter(f"catalog = '{catalog_name}'")
-display(catalogs_df)
-
-# COMMAND ----------
-
 table_errors = []
 table_properities_system_level = ['delta.liquid.clusteringColumns', 'delta.rowTracking.materializedRowIdColumnName', 'delta.rowTracking.materializedRowCommitVersionColumnName']
 
-#delete catalog which are not in primary any more
+# delete catalog which are not in primary any more
 deleted_catalog_list = get_deleted_catalog(catalogs_df)
 if len(deleted_catalog_list) > 0:
     print(f"----These catalogs are not exsiting in primary: {deleted_catalog_list}, and they will be deleted")
@@ -75,19 +62,15 @@ if len(deleted_catalog_list) > 0:
         print(drop_schema_stm)
         spark.sql(drop_schema_stm)
 
-for catalog in catalogs_df.collect():
-    catalog_name = catalog.catalog
-    print(catalog_name)
-    catalog_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/catalogs") 
-    for catalog in catalog_df.collect():     
-        spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog.catalog_name} COMMENT '{catalog.comment}'")
-        spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`")
+for catalog in catalogs_df.collect():     
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog.catalog_name} COMMENT '{catalog.comment}'")
+    spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`")
 
     #Get only user schemas
-    schemas_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/schemata").filter("schema_name<>'information_schema'")
+    schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter(f"schema_name<>'information_schema' and catalog_name='{catalog.catalog_name}'")
 
-    #delete schemas which are not in primary any more
-    deleted_schema_list = get_deleted_schema(catalog_name, schemas_df)
+    # delete schemas which are not in primary any more
+    deleted_schema_list = get_deleted_schema(catalog.catalog_name, schemas_df)
     if len(deleted_schema_list) > 0:
         print(f"----These schemas are not exsiting in primary: {deleted_schema_list}, and they will be deleted")
         for schema in deleted_schema_list:
@@ -98,15 +81,15 @@ for catalog in catalogs_df.collect():
     #Create all user schemas on the target catalog
 
     for schema in schemas_df.collect():
-        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'")
-        spark.sql(f"ALTER SCHEMA {catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`")
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema.catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'")
+        spark.sql(f"ALTER SCHEMA {schema.catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`")
 
     #Get only external user tables
-    tables_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/tables").filter("table_schema<>'information_schema' and table_type='EXTERNAL'")
+    tables_df = spark.read.format("delta").load(f"{storage_location}/tables").filter(f"table_schema<>'information_schema' and table_type='EXTERNAL' and table_catalog='{catalog.catalog_name}'")
     tables_df = tables_df.withColumn("full_name", concat_ws(".", col("table_catalog"), col("table_schema"), col("table_name")))
     tables_df = tables_df.join(tables_details_df, on="full_name", how="left")
     
-    deleted_table_list = get_deleted_table(catalog_name, tables_df)
+    deleted_table_list = get_deleted_table(catalog.catalog_name, tables_df)
     if len(deleted_table_list) > 0:
         print(f"----These tables are not exsiting in primary: {deleted_table_list}, and they will be deleted")
         for table in deleted_table_list:
@@ -115,9 +98,10 @@ for catalog in catalogs_df.collect():
             spark.sql(drop_table_stmt)
     
     for table in tables_df.collect():
-        columns_df = spark.read.format("delta").load(f"{storage_location}/{catalog_name}/columns").filter((col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
-        name = f"{catalog_name}.{table.table_schema}.{table.table_name}"
+        name = f"{table.table_catalog}.{table.table_schema}.{table.table_name}"
         print(name)
+        
+        columns_df = spark.read.format("delta").load(f"{storage_location}/columns").filter((col("table_catalog") == table.table_catalog) & (col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
         columns = return_schema(columns_df)
         #Create Table
         try:
@@ -125,7 +109,7 @@ for catalog in catalogs_df.collect():
             print(drop_table_stmt)
             spark.sql(drop_table_stmt)
             # ct_stmt = tcs_dict[name]
-            ct_stmt = f"CREATE TABLE IF NOT EXISTS {catalog_name}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
+            ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             if table.partitionColumns is not None and table.partitionColumns !=[]:
                 pks = ",".join(table.partitionColumns)
                 ct_stmt = ct_stmt + f" PARTITIONED BY ({pks})" 
@@ -156,5 +140,5 @@ if len(table_errors) > 0:
 
 # spark.sql(f"CREATE CATALOG IF NOT EXISTS uc_dr_dummy")
 # spark.sql(f"CREATE SCHEMA IF NOT EXISTS uc_dr.dummy_test_cases")
-# spark.sql(f"create table if not exists uc_dr.test_cases.delta_table1 (c1 int, c2 string) using delta location '{root_externalstorage}uc_dr/test_cases/delta_table1'")
-# spark.sql(f"create table if not exists uc_dr.default.delta_table1 (c1 int, c2 string) using delta location '{root_externalstorage}uc_dr/default/delta_table1'")
+# spark.sql(f"create table if not exists uc_dr.test_cases.delta_table1 (c1 int, c2 string) using delta location 'abfss://data@starbucksdev.dfs.core.windows.net/daibo/uc_dr/test_cases/delta_table1'")
+# spark.sql(f"create table if not exists uc_dr.default.delta_table1 (c1 int, c2 string) using delta location 'abfss://data@starbucksdev.dfs.core.windows.net/daibo/uc_dr/default/delta_table1'")

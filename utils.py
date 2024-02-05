@@ -22,11 +22,11 @@ def return_schema(df):
 def get_deleted_catalog(primary_catalog_df):
     primary_catalog_list = []
     secondary_catalog_list = []
-    secondary_catalogs_df = spark.sql("SHOW CATALOGS").filter("catalog<>'hive_metastore' and catalog<>'system' and catalog<>'samples' and catalog <>'__databricks_internal'")
+    secondary_catalogs_df = spark.sql("select * from system.information_schema.catalogs").filter("catalog_owner<>'System user'")
     for catalog in primary_catalog_df.collect():
-        primary_catalog_list.append(catalog.catalog)
+        primary_catalog_list.append(catalog.catalog_name)
     for catalog in secondary_catalogs_df.collect():
-        secondary_catalog_list.append(catalog.catalog)   
+        secondary_catalog_list.append(catalog.catalog_name)   
     deleted_catalogs = [item for item in secondary_catalog_list if item not in primary_catalog_list]
     return deleted_catalogs
 
