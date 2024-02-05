@@ -21,14 +21,6 @@ print(storage_location)
 
 # COMMAND ----------
 
-# all_catalogs = spark.read.format("delta").load(f"{storage_location}/catalogs").filter("catalog_owner<>'System user'")
-
-# COMMAND ----------
-
-# display(all_catalogs)
-
-# COMMAND ----------
-
 tables_df = spark.read.format("delta").load(f"{storage_location}/tables").filter("table_schema<>'information_schema' and table_type='EXTERNAL'")
 
 # COMMAND ----------
@@ -40,15 +32,16 @@ table_errors = []
 tables_create_stmt = []
 
 for table in tables_df.collect():
-    print(f"----scan details for external table: {table.table_catalog}.{table.table_schema}.{table.table_name}")
+    name = f"{table.table_catalog}.{table.table_schema}.{table.table_name}"
+    print(f"----scan details for external table: {name}")
     try:
-        table_info = spark.sql(f"DESCRIBE DETAIL {table.table_catalog}.{table.table_schema}.{table.table_name}").first()
-        tables_info.append([f"{table.table_catalog}.{table.table_schema}.{table.table_name}", table_info['location'], table_info['partitionColumns'], table_info['clusteringColumns'], table_info['properties'], table_info['format']])
-        createtab_stmt = spark.sql(f"SHOW CREATE TABLE {table.table_catalog}.{table.table_schema}.{table.table_name}").first()['createtab_stmt']
-        tables_create_stmt.append([f"{table.table_catalog}.{table.table_schema}.{table.table_name}", createtab_stmt])
+        table_info = spark.sql(f"DESCRIBE DETAIL {name}").first()
+        tables_info.append([name, table_info['location'], table_info['partitionColumns'], table_info['clusteringColumns'], table_info['properties'], table_info['format']])
+        createtab_stmt = spark.sql(f"SHOW CREATE TABLE {name}").first()['createtab_stmt']
+        tables_create_stmt.append([name, createtab_stmt])
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
-        table_errors.append([f"{table.table_catalog}.{table.table_schema}.{table.table_name}", f"An unexpected error occurred: {e}"])
+        table_errors.append([name, f"An unexpected error occurred: {e}"])
 
 schema = StructType([
     StructField("full_name", StringType(), True),
