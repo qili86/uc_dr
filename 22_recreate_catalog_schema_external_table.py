@@ -8,8 +8,6 @@
 # MAGIC
 # MAGIC Assumptions:
 # MAGIC - The storage credential(s) and external location(s) of the parent external location needs to be created on the target UC beforehand.
-# MAGIC - The external location for all schemas is the same, formed of ```<storage location root>/<schema name>/<table name>```
-# MAGIC - All tables are Delta
 
 # COMMAND ----------
 

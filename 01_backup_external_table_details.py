@@ -2,12 +2,12 @@
 # MAGIC %md
 # MAGIC ##Backup External Table Details
 # MAGIC
-# MAGIC This notebook will read from the information_schema of a given catalog and dump its contents to external storage.
+# MAGIC This notebook will read from the information_schema of a given external table and dump its details to external storage.
 # MAGIC
 # MAGIC This external storage will be independent from the UC storage and will be accessible by a remote workspace on a different region with a different UC.
 # MAGIC
 # MAGIC Assumptions:
-# MAGIC - Dump and restore one catalog at a time (currently overwrites to the same folder)
+# MAGIC - Currently overwrites to the same file
 
 # COMMAND ----------
 
