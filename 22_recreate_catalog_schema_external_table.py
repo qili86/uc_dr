@@ -70,7 +70,7 @@ for catalog in catalogs_df.collect():
     schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter(f"schema_name<>'information_schema' and catalog_name='{catalog.catalog_name}'")
     schemas_df = schemas_df.withColumn("name", concat_ws(".", col("catalog_name"), col("schema_name")))
     schemas_df = schemas_df.join(schemas_details_df, on="name", how="left")
-    display(schema_df)
+    display(schemas_df)
 
     # delete schemas which are not in primary any more
     deleted_schema_list = get_deleted_schema(catalog.catalog_name, schemas_df)
@@ -84,7 +84,19 @@ for catalog in catalogs_df.collect():
     #Create all user schemas on the target catalog
 
     for schema in schemas_df.collect():
-        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema.catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'")
+        cs_stmt = f"CREATE SCHEMA IF NOT EXISTS {schema.catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'"
+        if schema.location is not None and schema.location != "":
+            cs_stmt = cs_stmt + f" MANAGED LOCATION '{schema.location}'"
+        if schema.properties is not None and schema.properties != "":
+            properties_str = ""
+            properties_dict = get_schema_properties(schema.properties)
+            if properties_dict != {}:
+                properties_str = "" 
+                for key, value in properties_dict.items():
+                    properties_str=properties_str+ f"'{key}'='{value}',"
+            cs_stmt = cs_stmt + f" WITH DBPROPERTIES ({properties_str[:-1]})"
+        print(cs_stmt)
+        spark.sql(cs_stmt)
         spark.sql(f"ALTER SCHEMA {schema.catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`")
 
     #Get only external user tables
