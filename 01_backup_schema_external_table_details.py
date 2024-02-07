@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC ##Backup External Table Details
+# MAGIC ##Backup Schema/External Table Details
 # MAGIC
-# MAGIC This notebook will read from the information_schema of a given external table and dump its details to external storage.
+# MAGIC This notebook will read from the information_schema of a given schema or external table and dump its details to external storage.
 # MAGIC
 # MAGIC This external storage will be independent from the UC storage and will be accessible by a remote workspace on a different region with a different UC.
 # MAGIC
