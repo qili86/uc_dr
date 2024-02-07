@@ -55,3 +55,11 @@ def get_deleted_table(catalog_name, primary_table_df):
         secondary_table_list.append(f"{table.table_catalog}.{table.table_schema}.{table.table_name}")   
     deleted_table = [item for item in secondary_table_list if item not in primary_table_list]
     return deleted_table
+
+# COMMAND ----------
+
+def get_schema_properties(properties_str):
+    pairs = re.findall(r'\(([^,]+),([^)]+)\)', properties_str)
+    # Convert key-value pairs to a dictionary
+    converted_dict = {str(key).lstrip('('): str(value) for key, value in pairs}
+    return converted_dict

@@ -36,6 +36,7 @@ display(catalogs_df)
 # COMMAND ----------
 
 tables_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_details")
+display(tables_details_df)
 tables_create_stmts_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_create_stmts")
 tcs_dict = {}
 for tcs in tables_create_stmts_df.collect():
@@ -44,7 +45,8 @@ print(tcs_dict)
 
 # COMMAND ----------
 
-display(tables_details_df)
+schemas_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_schemas_details")
+display(schemas_details_df)
 
 # COMMAND ----------
 
@@ -66,6 +68,9 @@ for catalog in catalogs_df.collect():
 
     #Get only user schemas
     schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter(f"schema_name<>'information_schema' and catalog_name='{catalog.catalog_name}'")
+    schemas_df = schemas_df.withColumn("name", concat_ws(".", col("catalog_name"), col("schema_name")))
+    schemas_df = schemas_df.join(schemas_details_df, on="name", how="left")
+    display(schema_df)
 
     # delete schemas which are not in primary any more
     deleted_schema_list = get_deleted_schema(catalog.catalog_name, schemas_df)
