@@ -155,6 +155,13 @@ for catalog in catalogs_df.collect():
             drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
             print(drop_table_stmt)
             spark.sql(drop_table_stmt)
+        """
+        Support Notes:
+            * The current solution is drop table and recreate table in case table schema changes e.g. drop/rename columns, otherwise
+            it is better to use CREATE OR REPLACE TABLE ... because drop table will drop delta histories 
+            Moreover CREATE OR REPLACE TABLE might not support for parquet, csv format, please test out those cases,if so, for such types, you might
+            still drop and recreate, and they basically don't have history either
+        """
             # ct_stmt = tcs_dict[name]
             ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             if table.partitionColumns is not None and table.partitionColumns !=[]:
