@@ -26,7 +26,6 @@ print(storage_location)
 # COMMAND ----------
 
 catalogs_df = spark.read.format("delta").load(f"{storage_location}/catalogs").filter("catalog_owner<>'System user'")
-display(catalogs_df)
 
 # COMMAND ----------
 
@@ -35,8 +34,6 @@ display(catalogs_df)
 
 # COMMAND ----------
 
-tables_details_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_details")
-display(tables_details_df)
 tables_create_stmts_df = spark.read.format("delta").load(f"{storage_location}/uc_dr_tables_create_stmts")
 tcs_dict = {}
 for tcs in tables_create_stmts_df.collect():
@@ -139,38 +136,16 @@ for catalog in catalogs_df.collect():
     for table in tables_df.collect():
         name = f"{table.table_catalog}.{table.table_schema}.{table.table_name}"
         print(name)
-        # columns_df = spark.read.format("delta").load(f"{storage_location}/columns").filter((col("table_catalog") == table.table_catalog) & (col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
-        # columns = return_schema(columns_df)
-        #Create Table
-
         """
         Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html
         for delta table, using CREATE OR REPLACE
         for none-delta table, using CREATE IF NOT EXISTS 
         NOT Supported for Schema Change (drop/rename columns), otherwise, we have to use drop and recreate
         """
-
         try:
             ct_stmt = tcs_dict[name]
             print(f"original ct_stmt: {ct_stmt}")
             ct_stmt = process_ct_stmt(ct_stmt)
-            # ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
-            # if table.partitionColumns is not None and table.partitionColumns !=[]:
-            #     pks = ",".join(table.partitionColumns)
-            #     ct_stmt = ct_stmt + f" PARTITIONED BY ({pks})" 
-            # if table.clusteringColumns is not None and table.clusteringColumns != []:
-            #     cks = ",".join(table.clusteringColumns)
-            #     ct_stmt = ct_stmt + f" CLUSTER BY ({cks})" 
-            # if table.properties is not None and table.properties != {}:
-            #     ppts=table.properties
-            #     for ppt in table_properities_system_level:
-            #         ppts.pop(ppt, None)
-            #     if ppts != {}:
-            #         properties_str = "" 
-            #         for key, value in ppts.items():
-            #             properties_str=properties_str+ f"'{key}'='{value}',"
-            #         ct_stmt = ct_stmt + f" TBLPROPERTIES ({properties_str[:-1]})"
-            
             print(f"final ct_stmt: {ct_stmt}")
             spark.sql(ct_stmt)
             spark.sql(f"ALTER TABLE {name} SET OWNER to `{table.table_owner}`")
