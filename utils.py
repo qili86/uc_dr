@@ -90,6 +90,3 @@ def use_create_if_not_exist_for_non_delta(ct_stmt):
     modified_ct_stmt = re.sub(pattern, "CREATE TABLE IF NOT EXISTS", ct_stmt, count=1)
     return modified_ct_stmt
 
-# COMMAND ----------
-
-spark.sql(f"select * from system.information_schema.schemata").filter("schema_name<>'information_schema' and schema_owner<>'System user'").display()
