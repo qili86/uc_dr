@@ -63,3 +63,10 @@ def get_schema_properties(properties_str):
     # Convert key-value pairs to a dictionary
     converted_dict = {str(key).lstrip('('): str(value) for key, value in pairs}
     return converted_dict
+
+# COMMAND ----------
+
+def process_ct_stmt(ct_stmt):
+    pattern = re.compile(r"TBLPROPERTIES\s*\([^)]+\)")
+    modified_ct_stmt = re.sub(pattern, "", ct_stmt)
+    return modified_ct_stmt
