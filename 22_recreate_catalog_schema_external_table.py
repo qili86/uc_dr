@@ -139,8 +139,8 @@ for catalog in catalogs_df.collect():
     for table in tables_df.collect():
         name = f"{table.table_catalog}.{table.table_schema}.{table.table_name}"
         print(name)
-        columns_df = spark.read.format("delta").load(f"{storage_location}/columns").filter((col("table_catalog") == table.table_catalog) & (col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
-        columns = return_schema(columns_df)
+        # columns_df = spark.read.format("delta").load(f"{storage_location}/columns").filter((col("table_catalog") == table.table_catalog) & (col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
+        # columns = return_schema(columns_df)
         #Create Table
 
         """
@@ -152,17 +152,26 @@ for catalog in catalogs_df.collect():
         """
 
         try:
-            drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
-            print(drop_table_stmt)
-            spark.sql(drop_table_stmt)
-            """
-            Support Notes:
-                * The current solution is drop table and recreate table in case table schema changes e.g. drop/rename columns, otherwise
-                it is better to use CREATE OR REPLACE TABLE ... because drop table will drop delta histories 
-                Moreover CREATE OR REPLACE TABLE might not support for parquet, csv format, please test out those cases,if so, for such types, you might
-                still drop and recreate, and they basically don't have history either
-            """
             ct_stmt = tcs_dict[name]
+            print(f"original ct_stmt: {ct_stmt}")
+            using_line = extract_using_line(ct_stmt)
+            print(f"extract using line: {using_line}")
+            ct_stmt = process_ct_stmt(ct_stmt)
+            print(f"after removing properities: {ct_stmt}")
+            if 'delta' in using_line:
+                ct_stmt = use_create_or_replace(ct_stmt)
+                print(f"for delta table using create or replace ---- : {ct_stmt}")
+            else:
+                drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
+                print(f"for non-delta table: {drop_table_stmt}")
+                spark.sql(drop_table_stmt)
+                """
+                Support Notes:
+                    * The current solution is drop table and recreate table in case table schema changes e.g. drop/rename columns, otherwise
+                    it is better to use CREATE OR REPLACE TABLE ... because drop table will drop delta histories 
+                    Moreover CREATE OR REPLACE TABLE might not support for parquet, csv format, please test out those cases,if so, for such types, you might
+                    still drop and recreate, and they basically don't have history either
+                """
             # ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             # if table.partitionColumns is not None and table.partitionColumns !=[]:
             #     pks = ",".join(table.partitionColumns)
@@ -179,10 +188,8 @@ for catalog in catalogs_df.collect():
             #         for key, value in ppts.items():
             #             properties_str=properties_str+ f"'{key}'='{value}',"
             #         ct_stmt = ct_stmt + f" TBLPROPERTIES ({properties_str[:-1]})"
-            print(f"before------- {ct_stmt}")
-            modified_ct_stmt = process_ct_stmt(ct_stmt)
-            print(f"after------- {modified_ct_stmt}")
-            spark.sql(modified_ct_stmt)
+            print(f"final ct_stmt: {ct_stmt}")
+            spark.sql(ct_stmt)
             spark.sql(f"ALTER TABLE {name} SET OWNER to `{table.table_owner}`")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
@@ -198,10 +205,3 @@ if len(table_errors) > 0:
 # spark.sql(f"CREATE SCHEMA IF NOT EXISTS uc_dr.dummy_test_cases")
 # spark.sql(f"create table if not exists uc_dr.test_cases.delta_table1 (c1 int, c2 string) using delta location 'abfss://data@starbucksdev.dfs.core.windows.net/daibo/uc_dr/test_cases/delta_table1'")
 # spark.sql(f"create table if not exists uc_dr.default.delta_table1 (c1 int, c2 string) using delta location 'abfss://data@starbucksdev.dfs.core.windows.net/daibo/uc_dr/default/delta_table1'")
-
-# COMMAND ----------
-
-def process_ctstmt(ct_stmt)
-    pattern = re.compile(r"TBLPROPERTIES\s*\([^)]+\)")
-    modified_ct_stmt = re.sub(pattern, "", ct_stmt)
-    return modified_ct_stmt

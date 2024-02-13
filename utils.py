@@ -70,3 +70,22 @@ def process_ct_stmt(ct_stmt):
     pattern = re.compile(r"TBLPROPERTIES\s*\([^)]+\)")
     modified_ct_stmt = re.sub(pattern, "", ct_stmt)
     return modified_ct_stmt
+
+# COMMAND ----------
+
+def extract_using_line(ct_stmt):
+    pattern = re.compile(r"(USING\s+[a-zA-Z0-9_]+\s*)")
+    match = re.search(pattern, ct_stmt)
+    if match:
+        using_line = match.group(1)
+        # print(using_line)
+        return using_line
+    else:
+        print(f"USING XXX line not found in the {ct_stmt}.")
+
+# COMMAND ----------
+
+def use_create_or_replace(ct_stmt):
+    pattern = re.compile(r"CREATE TABLE", re.IGNORECASE)
+    modified_ct_stmt = re.sub(pattern, "CREATE OR REPLACE TABLE", ct_stmt, count=1)
+    return modified_ct_stmt
