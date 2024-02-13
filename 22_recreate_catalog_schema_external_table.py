@@ -65,23 +65,23 @@ if len(deleted_catalog_list) > 0:
 for catalog in catalogs_df.collect():     
     spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog.catalog_name} COMMENT '{catalog.comment}'")
     spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`") 
-        """
-        Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-catalog.html
-        CREATE CATALOG [ IF NOT EXISTS ] catalog_name
-            [ USING SHARE provider_name . share_name ]
-            [ MANAGED LOCATION 'location_path' ]
-            [ COMMENT comment ]
+    """
+    Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-catalog.html
+    CREATE CATALOG [ IF NOT EXISTS ] catalog_name
+        [ USING SHARE provider_name . share_name ]
+        [ MANAGED LOCATION 'location_path' ]
+        [ COMMENT comment ]
 
-        CREATE FOREIGN CATALOG [ IF NOT EXISTS ] catalog_name
-            USING CONNECTION connection_name
-            [ COMMENT comment ]
-            OPTIONS ( { option_name = option_value } [ , ... ] )
+    CREATE FOREIGN CATALOG [ IF NOT EXISTS ] catalog_name
+        USING CONNECTION connection_name
+        [ COMMENT comment ]
+        OPTIONS ( { option_name = option_value } [ , ... ] )
 
-        Support Notes:
-            * Need support for MANAGED LOCATION
-            * Might need support for Foreign catalogs
-            * Might need support for Using Share provider_name.share_name
-        """
+    Support Notes:
+        * Need support for MANAGED LOCATION
+        * Might need support for Foreign catalogs
+        * Might need support for Using Share provider_name.share_name
+    """
 
     #Get only user schemas
     schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter(f"schema_name<>'information_schema' and catalog_name='{catalog.catalog_name}'")
@@ -99,13 +99,13 @@ for catalog in catalogs_df.collect():
             spark.sql(drop_schema_stmt)
     
     #Create all user schemas on the target catalog
-        """
-        Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-schema.html
-        CREATE SCHEMA [ IF NOT EXISTS ] schema_name
-            [ COMMENT schema_comment ]
-            [ LOCATION schema_directory | MANAGED LOCATION location_path ]
-            [ WITH DBPROPERTIES ( { property_name = property_value } [ , ... ] ) ]
-        """
+    """
+    Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-schema.html
+    CREATE SCHEMA [ IF NOT EXISTS ] schema_name
+        [ COMMENT schema_comment ]
+        [ LOCATION schema_directory | MANAGED LOCATION location_path ]
+        [ WITH DBPROPERTIES ( { property_name = property_value } [ , ... ] ) ]
+    """
     for schema in schemas_df.collect():
         cs_stmt = f"CREATE SCHEMA IF NOT EXISTS {schema.catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'"
         if schema.location is not None and schema.location != "":
@@ -155,13 +155,13 @@ for catalog in catalogs_df.collect():
             drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
             print(drop_table_stmt)
             spark.sql(drop_table_stmt)
-        """
-        Support Notes:
-            * The current solution is drop table and recreate table in case table schema changes e.g. drop/rename columns, otherwise
-            it is better to use CREATE OR REPLACE TABLE ... because drop table will drop delta histories 
-            Moreover CREATE OR REPLACE TABLE might not support for parquet, csv format, please test out those cases,if so, for such types, you might
-            still drop and recreate, and they basically don't have history either
-        """
+            """
+            Support Notes:
+                * The current solution is drop table and recreate table in case table schema changes e.g. drop/rename columns, otherwise
+                it is better to use CREATE OR REPLACE TABLE ... because drop table will drop delta histories 
+                Moreover CREATE OR REPLACE TABLE might not support for parquet, csv format, please test out those cases,if so, for such types, you might
+                still drop and recreate, and they basically don't have history either
+            """
             # ct_stmt = tcs_dict[name]
             ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             if table.partitionColumns is not None and table.partitionColumns !=[]:
