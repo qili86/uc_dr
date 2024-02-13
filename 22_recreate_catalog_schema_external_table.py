@@ -145,25 +145,15 @@ for catalog in catalogs_df.collect():
 
         """
         Docs: https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html
-        for delta table, using Create or Replace
-        for none-delta table, drop and recreate
+        for delta table, using CREATE OR REPLACE
+        for none-delta table, using CREATE IF NOT EXISTS 
+        NOT Supported for Schema Change (drop/rename columns), otherwise, we have to use drop and recreate
         """
 
         try:
             ct_stmt = tcs_dict[name]
             print(f"original ct_stmt: {ct_stmt}")
-            using_line = extract_using_line(ct_stmt)
-            print(f"extract using line: {using_line}")
             ct_stmt = process_ct_stmt(ct_stmt)
-            print(f"after removing properities: {ct_stmt}")
-            if 'delta' in using_line:
-                ct_stmt = use_create_or_replace(ct_stmt)
-                print(f"for delta table using create or replace ---- : {ct_stmt}")
-            else:
-                drop_table_stmt = f"DROP TABLE IF EXISTS {name}"
-                print(f"for non-delta table: {drop_table_stmt}")
-                spark.sql(drop_table_stmt)
-
             # ct_stmt = f"CREATE TABLE IF NOT EXISTS {table.table_catalog}.{table.table_schema}.{table.table_name}({columns}) USING {table.format} COMMENT '{table.comment}' LOCATION '{table.location}'"
             # if table.partitionColumns is not None and table.partitionColumns !=[]:
             #     pks = ",".join(table.partitionColumns)
@@ -180,6 +170,7 @@ for catalog in catalogs_df.collect():
             #         for key, value in ppts.items():
             #             properties_str=properties_str+ f"'{key}'='{value}',"
             #         ct_stmt = ct_stmt + f" TBLPROPERTIES ({properties_str[:-1]})"
+            
             print(f"final ct_stmt: {ct_stmt}")
             spark.sql(ct_stmt)
             spark.sql(f"ALTER TABLE {name} SET OWNER to `{table.table_owner}`")

@@ -68,24 +68,39 @@ def get_schema_properties(properties_str):
 
 def process_ct_stmt(ct_stmt):
     pattern = re.compile(r"TBLPROPERTIES\s*\([^)]+\)")
-    modified_ct_stmt = re.sub(pattern, "", ct_stmt)
-    return modified_ct_stmt
+    ct_stmt = re.sub(pattern, "", ct_stmt)
+    if is_delta(ct_stmt):
+       ct_stmt = use_create_or_replace_for_delta(ct_stmt)
+    else:
+        ct_stmt = use_create_if_not_exist_for_non_delta(ct_stmt)
+    return ct_stmt
 
 # COMMAND ----------
 
-def extract_using_line(ct_stmt):
+def is_delta(ct_stmt):
     pattern = re.compile(r"(USING\s+[a-zA-Z0-9_]+\s*)")
     match = re.search(pattern, ct_stmt)
     if match:
         using_line = match.group(1)
         # print(using_line)
-        return using_line
+        if 'delta' in using_line:
+           return True
+        else:
+           return False
     else:
         print(f"USING XXX line not found in the {ct_stmt}.")
+        return False
 
 # COMMAND ----------
 
-def use_create_or_replace(ct_stmt):
+def use_create_or_replace_for_delta(ct_stmt):
     pattern = re.compile(r"CREATE TABLE", re.IGNORECASE)
     modified_ct_stmt = re.sub(pattern, "CREATE OR REPLACE TABLE", ct_stmt, count=1)
+    return modified_ct_stmt
+
+# COMMAND ----------
+
+def use_create_if_not_exist_for_non_delta(ct_stmt):
+    pattern = re.compile(r"CREATE TABLE", re.IGNORECASE)
+    modified_ct_stmt = re.sub(pattern, "CREATE TABLE IF NOT EXISTS", ct_stmt, count=1)
     return modified_ct_stmt
