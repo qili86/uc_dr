@@ -21,6 +21,11 @@ print(storage_location)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ##Backup Schema Details
+
+# COMMAND ----------
+
 schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter("schema_owner<>'System user'")
 schemas_info = []
 schema_errors = []
@@ -43,6 +48,11 @@ schemas_info_df.write.format("delta").mode("overwrite").save(f"{storage_location
 if len(schema_errors) > 0:
     schema_errors = spark.createDataFrame(schema_errors, ['schema_name', 'error'])
     display(schema_errors)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Backup Table Details
 
 # COMMAND ----------
 
