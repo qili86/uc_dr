@@ -1,4 +1,9 @@
 -- Databricks notebook source
+-- MAGIC %md
+-- MAGIC ##create managed table
+
+-- COMMAND ----------
+
 CREATE TABLE main.default.department
 (
   deptcode  INT,
@@ -19,8 +24,18 @@ select * from main.default.department
 
 -- COMMAND ----------
 
+-- MAGIC %md
+-- MAGIC ##deep clone manged table
+
+-- COMMAND ----------
+
 CREATE OR REPLACE TABLE uc_migration.default.department
 DEEP CLONE main.default.department;
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### add a new column to the original table
 
 -- COMMAND ----------
 
@@ -42,12 +57,22 @@ select * from uc_migration.default.department
 
 -- COMMAND ----------
 
+-- MAGIC %md
+-- MAGIC ### deep clone carry over the new column
+
+-- COMMAND ----------
+
 CREATE OR REPLACE TABLE uc_migration.default.department
 DEEP CLONE main.default.department;
 
 -- COMMAND ----------
 
 select * from uc_migration.default.department
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### deep clone copy data changes incrementally
 
 -- COMMAND ----------
 
@@ -71,7 +96,6 @@ describe history uc_migration.default.department
 
 DELETE FROM main.default.department WHERE new_column = '11';
 
-
 -- COMMAND ----------
 
 CREATE OR REPLACE TABLE uc_migration.default.department
@@ -84,6 +108,11 @@ describe history uc_migration.default.department
 -- COMMAND ----------
 
 select * from uc_migration.default.department
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### trying to drop a column
 
 -- COMMAND ----------
 
@@ -110,6 +139,11 @@ DROP COLUMN new_column;
 -- COMMAND ----------
 
 select * from main.default.department
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### drop columns will break deep clone
 
 -- COMMAND ----------
 
