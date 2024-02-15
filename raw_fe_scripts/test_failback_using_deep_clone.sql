@@ -25,7 +25,7 @@ select * from main.default.org
 -- COMMAND ----------
 
 -- MAGIC %md
--- MAGIC ##deep clone manged table
+-- MAGIC ##deep clone manged table to secondary catalog (for DR), this could be on a secondary region/workspace with the same catalog name, here using the following example for simplicity 
 
 -- COMMAND ----------
 
