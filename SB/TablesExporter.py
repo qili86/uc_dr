@@ -9,7 +9,7 @@ from delta import *
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
-dbutils.widgets.text("storage_location", "/tmp/testing_sb_dr/dr1/")
+dbutils.widgets.text("storage_location", "/tmp/testing_sb_dr/dr1")
 
 storage_location = dbutils.widgets.get("storage_location")
 
@@ -118,7 +118,6 @@ class TablesExporter:
 
     def __get_table_privileges(self, managed_tables: DataFrame, external_tables: DataFrame) -> DataFrame:
       tables = managed_tables.select("table_catalog", "table_schema", "table_name").union(external_tables.select("table_catalog", "table_schema", "table_name"))
-      print("tables count: ", tables.count())
       table_privileges = self.spark.read.format("delta").table("`system`.information_schema.table_privileges")
       return (tables.alias("t").join(table_privileges.alias("p"), (tables.table_catalog == table_privileges.table_catalog) & (tables.table_schema== table_privileges.table_schema) 
                                      & (tables.table_name== table_privileges.table_name)).select("p.*"))
